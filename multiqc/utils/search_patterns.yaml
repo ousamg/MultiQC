@@ -404,5 +404,7 @@ vcftools/tstv_by_qual:
     fn: '*.TsTv.qual'
 vcftools/tstv_summary:
     fn: '*.TsTv.summary'
+vcpipe:
+    fn: 'qc_result.json'
 verifybamid/selfsm:
     fn: '*.selfSM'
