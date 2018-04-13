@@ -127,6 +127,7 @@ setup(
             'tophat = multiqc.modules.tophat:MultiqcModule',
             'trimmomatic = multiqc.modules.trimmomatic:MultiqcModule',
             'vcftools = multiqc.modules.vcftools:MultiqcModule',
+            'vcpipe = multiqc.modules.vcpipe:MultiqcModule',
             'verifybamid = multiqc.modules.verifybamid:MultiqcModule'
         ],
         'multiqc.templates.v1': [
