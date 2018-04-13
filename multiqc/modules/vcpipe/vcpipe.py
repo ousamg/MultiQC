@@ -15,6 +15,20 @@ log = logging.getLogger(__name__)
 
 class MultiqcModule(BaseMultiqcModule):
 
+    expected_keys = [
+        "CalculateHsMetrics",
+        "CollectInsertSizeMetrics",
+        "VcfQuality",
+        "CollectAlignmentSummaryMetrics",
+        "LowCoverageRegions",
+        "BaseQuality"
+    ]
+    process_keys = [
+        "VcfQuality",
+        "LowCoverageRegions",
+        "BaseQuality"
+    ]
+
     def __init__(self):
 
         super(MultiqcModule, self).__init__(
