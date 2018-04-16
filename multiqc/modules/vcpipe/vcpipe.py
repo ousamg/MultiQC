@@ -7,27 +7,17 @@ from collections import OrderedDict, Counter
 import logging
 import json
 from multiqc.modules.base_module import BaseMultiqcModule
+<<<<<<< HEAD
 from multiqc.plots import bargraph, table
+=======
+from multiqc.plots import bargraph, linegraph, table
+>>>>>>> working genstats and VcfQuality
 import re
 
 log = logging.getLogger(__name__)
 
 
 class MultiqcModule(BaseMultiqcModule):
-
-    expected_keys = [
-        "CalculateHsMetrics",
-        "CollectInsertSizeMetrics",
-        "VcfQuality",
-        "CollectAlignmentSummaryMetrics",
-        "LowCoverageRegions",
-        "BaseQuality"
-    ]
-    process_keys = [
-        "VcfQuality",
-        "LowCoverageRegions",
-        "BaseQuality"
-    ]
 
     def __init__(self):
 
@@ -42,11 +32,19 @@ class MultiqcModule(BaseMultiqcModule):
         self.general_stats_data = dict()
         self.vcpipe_seen = set()
         self.vcpipe_vcfquality_data = dict()
+<<<<<<< HEAD
         self.vcpipe_lowcoverage_data = dict(depth=dict(), size=dict())
         self.vcpipe_basequality_data = dict()
         n = dict()
 
         re_sname = re.compile("Diag-(.+?)\/")
+=======
+        self.vcpipe_lowcoverage_data = dict()
+        self.vcpipe_basequality_data = dict()
+        n = dict()
+
+        re_sname = re.compile("\/Diag-(.+?)\/")
+>>>>>>> working genstats and VcfQuality
         for f in self.find_log_files("vcpipe"):
             sname_match = re.search(pattern=re_sname, string=f["root"])
             if sname_match:
@@ -58,10 +56,20 @@ class MultiqcModule(BaseMultiqcModule):
             if n > 0:
                 self.add_data_source(f)
 
+<<<<<<< HEAD
         self.general_stats_addcols(self.general_stats_data, self.general_stats_header)
 
         # print_vcf = sum([s["status"] for s in self.vcpipe_vcfquality_data.values()]) < len(self.vcpipe_vcfquality_data)
         if len(self.vcpipe_vcfquality_data) > 0:  # and print_vcf:
+=======
+        log.debug(json.dumps(self.general_stats_header, indent=4))
+        self.general_stats_addcols(self.general_stats_data, self.general_stats_header)
+
+        # difference between sum of status and total entries is number of QC failures in that key
+        # only show by default if there is a failure in that section
+        print_vcf = sum([s["status"] for s in self.vcpipe_vcfquality_data.values()]) < len(self.vcpipe_vcfquality_data)
+        if len(self.vcpipe_vcfquality_data) > 0 and print_vcf:
+>>>>>>> working genstats and VcfQuality
             self.write_data_file(self.vcpipe_vcfquality_data, 'multiqc_vcpipe_vcfquality')
             vq_headers = OrderedDict()
             vq_headers["skewedRatio"] = {
@@ -73,6 +81,7 @@ class MultiqcModule(BaseMultiqcModule):
             }
             vq_headers["variants"] = {
                 "title": "# of Variants",
+<<<<<<< HEAD
                 "format": "{:.0f}",
                 "scale": "RdPu"
             }
@@ -80,12 +89,22 @@ class MultiqcModule(BaseMultiqcModule):
                 "title": "Ti/Tv Ratio",
                 "scale": "Oranges",
                 "format": "{:.03f}",
+=======
+                "scale": "YlOrBr"
+            }
+            vq_headers["tiTvRatio"] = {
+                "title": "Ti/Tv Ratio",
+                "scale": "BrBG",
+>>>>>>> working genstats and VcfQuality
                 "min": 0,
                 "max": 5
             }
             vq_headers["contamination"] = {
                 "title": "Contamination",
+<<<<<<< HEAD
                 "format": "{:.0f}",
+=======
+>>>>>>> working genstats and VcfQuality
                 "scale": "RdYlGn-rev"
             }
 
@@ -97,6 +116,7 @@ class MultiqcModule(BaseMultiqcModule):
             )
 
         # print_lowcoverage = sum([s["status"] for s in self.vcpipe_lowcoverage_data.values()]) < len(self.vcpipe_lowcoverage_data)
+<<<<<<< HEAD
         if len(self.vcpipe_lowcoverage_data) > 0:  # and print_lowcoverage:
             log.info(json.dumps(self.vcpipe_lowcoverage_data))
             self.write_data_file(self.vcpipe_lowcoverage_data, 'multiqc_vcpipe_lowcoverage')
@@ -165,6 +185,13 @@ class MultiqcModule(BaseMultiqcModule):
                 anchor="vcpipe-basequality",
                 plot=bq_plot
             )
+=======
+        # if len(self.vcpipe_lowcoverage_data) > 0 and print_lowcoverage:
+        #     self.write_data_file(self.vcpipe_lowcoverage_data, 'multiqc_vcpipe_lowcoverage')
+
+        # if len(self.vcpipe_basequality_data) > 0:
+        #     self.write_data_file(self.vcpipe_basequality_data, 'multiqc_vcpipe_basequality')
+>>>>>>> working genstats and VcfQuality
 
     def parse_log(self, log_file):
         n = 0
