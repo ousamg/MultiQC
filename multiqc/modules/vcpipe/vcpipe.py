@@ -3,11 +3,11 @@
 """MultiQC module to parse output from OUS variant calling pipeline"""
 
 from __future__ import print_function
-from collections import OrderedDict
+from collections import OrderedDict, Counter
 import logging
 import json
 from multiqc.modules.base_module import BaseMultiqcModule
-from multiqc.plots import bargraph, linegraph, table
+from multiqc.plots import bargraph, table
 import re
 
 log = logging.getLogger(__name__)
@@ -44,13 +44,10 @@ class MultiqcModule(BaseMultiqcModule):
             if n > 0:
                 self.add_data_source(f)
 
-        log.debug(json.dumps(self.general_stats_header, indent=4))
         self.general_stats_addcols(self.general_stats_data, self.general_stats_header)
 
-        # difference between sum of status and total entries is number of QC failures in that key
-        # only show by default if there is a failure in that section
-        print_vcf = sum([s["status"] for s in self.vcpipe_vcfquality_data.values()]) < len(self.vcpipe_vcfquality_data)
-        if len(self.vcpipe_vcfquality_data) > 0 and print_vcf:
+        # print_vcf = sum([s["status"] for s in self.vcpipe_vcfquality_data.values()]) < len(self.vcpipe_vcfquality_data)
+        if len(self.vcpipe_vcfquality_data) > 0:  # and print_vcf:
             self.write_data_file(self.vcpipe_vcfquality_data, 'multiqc_vcpipe_vcfquality')
             vq_headers = OrderedDict()
             vq_headers["skewedRatio"] = {
@@ -62,16 +59,19 @@ class MultiqcModule(BaseMultiqcModule):
             }
             vq_headers["variants"] = {
                 "title": "# of Variants",
-                "scale": "YlOrBr"
+                "format": "{:.0f}",
+                "scale": "RdPu"
             }
             vq_headers["tiTvRatio"] = {
                 "title": "Ti/Tv Ratio",
-                "scale": "BrBG",
+                "scale": "Oranges",
+                "format": "{:.03f}",
                 "min": 0,
                 "max": 5
             }
             vq_headers["contamination"] = {
                 "title": "Contamination",
+                "format": "{:.0f}",
                 "scale": "RdYlGn-rev"
             }
 
@@ -83,11 +83,60 @@ class MultiqcModule(BaseMultiqcModule):
             )
 
         # print_lowcoverage = sum([s["status"] for s in self.vcpipe_lowcoverage_data.values()]) < len(self.vcpipe_lowcoverage_data)
-        # if len(self.vcpipe_lowcoverage_data) > 0 and print_lowcoverage:
-        #     self.write_data_file(self.vcpipe_lowcoverage_data, 'multiqc_vcpipe_lowcoverage')
+        if len(self.vcpipe_lowcoverage_data) > 0:  # and print_lowcoverage:
+            self.write_data_file(self.vcpipe_lowcoverage_data, 'multiqc_vcpipe_lowcoverage')
+            lc_config = {
+                "id": "vcpipe-lowcoverage",
+                "title": "vcpipe: Number of Regions with Low Coverage",
+                "cpswitch": False
+            }
+            lc_cats = [str(x) for x in range(1, 24)] + ["X", "Y", "M"]
 
-        # if len(self.vcpipe_basequality_data) > 0:
-        #     self.write_data_file(self.vcpipe_basequality_data, 'multiqc_vcpipe_basequality')
+            lc_plot = bargraph.plot(self.vcpipe_lowcoverage_data, cats=lc_cats, pconfig=lc_config)
+            self.add_section(
+                name="Low Coverage",
+                anchor="vcpipe-lowcoverage",
+                plot=lc_plot
+            )
+
+        # print_basequality = sum([s["status"] for s in self.vcpipe_basequality_data.values()]) < len(self.vcpipe_basequality_data)
+        if len(self.vcpipe_basequality_data) > 0:  # and print_basequality:
+            self.write_data_file(self.vcpipe_basequality_data, 'multiqc_vcpipe_basequality')
+            bq_headers = OrderedDict()
+            bq_headers["q30_bases_pct"] = {
+                "title": "Base Quality (q30)",
+                "description": "percentage of bases &ge; 30x coverage",
+                "scale": "OrRd-rev",
+                "suffix": "%",
+                "format": "{:.02f}",
+                "min": 0,
+                "max": 100
+            }
+            bq_headers["reads"] = {"title": "# of Reads"}
+            bq_headers["perfect_index_reads_pct"] = {
+                "title": "Perfect Index Reads",
+                "format": "{:.02f}",
+                "suffix": "%",
+                "hidden": True
+            }
+            bq_headers["mean_qual_score"] = {
+                "title": "Mean Quality Score",
+                "format": "{:.02f}",
+                "hidden": True
+            }
+            bq_headers["one_mismatch_index_pct"] = {
+                "title": "One Mismatch Index",
+                "format": "{:.02f}",
+                "suffix": "%",
+                "hidden": True
+            }
+            bq_plot = table.plot(self.vcpipe_basequality_data, headers=bq_headers)
+
+            self.add_section(
+                name="Base Quality",
+                anchor="vcpipe-basequality",
+                plot=bq_plot
+            )
 
     def parse_log(self, log_file):
         n = 0
@@ -101,27 +150,23 @@ class MultiqcModule(BaseMultiqcModule):
             self.general_stats_data[log_file['s_name']] = dict()
 
         if raw_data.get('VcfQuality') is not None:
-            self.parse_vcf_quality(log_file['s_name'], *raw_data['VcfQuality'])
-            n += 1
+            n += self.parse_vcfquality(log_file['s_name'], *raw_data['VcfQuality'])
         else:
             log.error("Could not find expected key 'VcfQuality' in file '{}'".format(log_file["root"]))
 
         if raw_data.get('LowCoverageRegions') is not None:
-            self.parse_low_coverage(log_file['s_name'], *raw_data['LowCoverageRegions'])
-            n += 1
+            n += self.parse_lowcoverage(log_file['s_name'], *raw_data['LowCoverageRegions'])
         else:
             log.error("Could not find expected key 'LowCoverageRegions' in file '{}'".format(log_file["root"]))
 
         if raw_data.get('BaseQuality') is not None:
-            self.parse_base_quality(log_file['s_name'], *raw_data['BaseQuality'])
-            n += 1
+            n += self.parse_basequality(log_file['s_name'], *raw_data['BaseQuality'])
         else:
             log.error("Could not find expected key 'BaseQuality' in file '{}'".format(log_file["root"]))
 
-        # return final_data
         return n
 
-    def parse_vcf_quality(self, s_name, status, data):
+    def parse_vcfquality(self, s_name, status, data):
         log.debug("Parsing VcfQuality section for {}".format(s_name))
 
         if 'VcfQuality' not in self.general_stats_header:
@@ -131,32 +176,44 @@ class MultiqcModule(BaseMultiqcModule):
         self.vcpipe_vcfquality_data[s_name] = data.copy()
         self.vcpipe_vcfquality_data[s_name]["status"] = status
 
-    def parse_low_coverage(self, s_name, status, data):
+        return 1
+
+    def parse_lowcoverage(self, s_name, status, data):
         log.debug("Parsing LowCoverageRegions section for {}".format(s_name))
 
         if 'LowCoverageRegions' not in self.general_stats_header:
-            self.general_stats_header["LowCoverageRegions"] = {
-                "title": "Low Coverage Regions",
-                "scale": "RdYlGn-rev"
-            }
+            # self.general_stats_header["LowCoverageRegions"] = {
+            #     "title": "Low Coverage Regions",
+            #     "scale": "RdYlGn-rev"
+            # }
+            self.general_stats_header["LowCoverageRegions"] = {"title": "Low Coverage Regions"}
 
+        self.general_stats_data[s_name]['LowCoverageRegions'] = status
         if data.get("failed") is not None:
-            self.general_stats_data[s_name]['LowCoverageRegions'] = len(data["failed"])
-            # self.vcpipe_lowcoverage_data[s_name]
+            # self.general_stats_data[s_name]['LowCoverageRegions'] = len(data["failed"])
+            chr_counts = Counter([r["chr"] for r in data["failed"]])
+            self.vcpipe_lowcoverage_data[s_name] = chr_counts
         else:
-            self.general_stats_data[s_name]['LowCoverageRegions'] = 0
+            return 0
 
-    def parse_base_quality(self, s_name, status, data):
+        return 1
+
+    def parse_basequality(self, s_name, status, data):
         log.debug("Parsing BaseQuality section for {}".format(s_name))
 
         if 'BaseQuality' not in self.general_stats_header:
-            self.general_stats_header["BaseQuality"] = {
-                "title": "Base Quality (q30)",
-                "description": "percentage of bases >= 30x coverage",
-                "scale": "OrRd-rev",
-                "min": 0,
-                "max": 100,
-                "suffix": "%"
-            }
+            # self.general_stats_header["BaseQuality"] = {
+            #     "title": "Base Quality (q30)",
+            #     "description": "percentage of bases >= 30x coverage",
+            #     "scale": "OrRd-rev",
+            #     "min": 0,
+            #     "max": 100,
+            #     "suffix": "%"
+            # }
+            self.general_stats_header["BaseQuality"] = {"title": "Base Quality"}
 
-        self.general_stats_data[s_name]['BaseQuality'] = data["q30_bases_pct"]
+        # self.general_stats_data[s_name]['BaseQuality'] = data["q30_bases_pct"]
+        self.general_stats_data[s_name]['BaseQuality'] = status
+        self.vcpipe_basequality_data[s_name] = data.copy()
+
+        return 1
