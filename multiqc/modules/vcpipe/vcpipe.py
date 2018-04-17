@@ -28,11 +28,11 @@ class MultiqcModule(BaseMultiqcModule):
         self.general_stats_data = dict()
         self.vcpipe_seen = set()
         self.vcpipe_vcfquality_data = dict()
-        self.vcpipe_lowcoverage_data = dict()
+        self.vcpipe_lowcoverage_data = dict(depth=dict(), size=dict())
         self.vcpipe_basequality_data = dict()
         n = dict()
 
-        re_sname = re.compile("\/Diag-(.+?)\/")
+        re_sname = re.compile("Diag-(.+?)\/")
         for f in self.find_log_files("vcpipe"):
             sname_match = re.search(pattern=re_sname, string=f["root"])
             if sname_match:
@@ -84,15 +84,29 @@ class MultiqcModule(BaseMultiqcModule):
 
         # print_lowcoverage = sum([s["status"] for s in self.vcpipe_lowcoverage_data.values()]) < len(self.vcpipe_lowcoverage_data)
         if len(self.vcpipe_lowcoverage_data) > 0:  # and print_lowcoverage:
+            log.info(json.dumps(self.vcpipe_lowcoverage_data))
             self.write_data_file(self.vcpipe_lowcoverage_data, 'multiqc_vcpipe_lowcoverage')
             lc_config = {
                 "id": "vcpipe-lowcoverage",
-                "title": "vcpipe: Number of Regions with Low Coverage",
-                "cpswitch": False
+                "title": "vcpipe: Regions with Low Coverage by Depth",
+                # "cpswitch_c_active": False,
+                "ylab": "Read Coverage of Regions",
+                "data_labels": ["Regions by Depth", "Regions by Size"]
+                # "cpswitch": False
             }
-            lc_cats = [str(x) for x in range(1, 24)] + ["X", "Y", "M"]
+            # lc_cats = [str(x) for x in range(1, 24)] + ["X", "Y", "M"]
+            # lc_cats = [str(x) for x in range(1, 30)]
+            lc_cats = [
+                OrderedDict([(x, {"name": x}) for x in range(1, 21)]),
+                ["<10", "10-19", "20-29", "30-49", "50-99", "100+"]
+            ]
 
-            lc_plot = bargraph.plot(self.vcpipe_lowcoverage_data, cats=lc_cats, pconfig=lc_config)
+            lc_plot = bargraph.plot(
+                [self.vcpipe_lowcoverage_data["depth"], self.vcpipe_lowcoverage_data["size"]],
+                cats=lc_cats,
+                pconfig=lc_config
+            )
+            # lc_plot = bargraph.plot(self.vcpipe_lowcoverage_data, pconfig=lc_config)
             self.add_section(
                 name="Low Coverage",
                 anchor="vcpipe-lowcoverage",
@@ -191,9 +205,12 @@ class MultiqcModule(BaseMultiqcModule):
         self.general_stats_data[s_name]['LowCoverageRegions'] = status
         if data.get("failed") is not None:
             # self.general_stats_data[s_name]['LowCoverageRegions'] = len(data["failed"])
-            chr_counts = Counter([r["chr"] for r in data["failed"]])
-            self.vcpipe_lowcoverage_data[s_name] = chr_counts
+            depth_counts = Counter([r["depth"] for r in data["failed"]])
+            region_size = Counter([region_cat(r["start"], r["stop"]) for r in data["failed"]])
+            self.vcpipe_lowcoverage_data["depth"][s_name] = dict(depth_counts)
+            self.vcpipe_lowcoverage_data["size"][s_name] = dict(region_size)
         else:
+            log.debug("No depth failures found for {}".format(s_name))
             return 0
 
         return 1
@@ -217,3 +234,19 @@ class MultiqcModule(BaseMultiqcModule):
         self.vcpipe_basequality_data[s_name] = data.copy()
 
         return 1
+
+
+def region_cat(start, end):
+    delta = int(end) - int(start) + 1
+    if delta < 10:
+        return "<10"
+    elif delta < 20:
+        return "10-19"
+    elif delta < 30:
+        return "20-29"
+    elif delta < 50:
+        return "30-49"
+    elif delta < 100:
+        return "50-99"
+    else:
+        return "100+"
