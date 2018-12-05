@@ -148,6 +148,7 @@ def get_filelist(run_module_names):
     # Go through the analysis directories and get file list
     for path in config.analysis_dir:
         if os.path.islink(path) and config.ignore_symlinks:
+            logger.debug("Skipping symlink {}".format(path))
             continue
         elif os.path.isfile(path):
             searchfiles.append([os.path.basename(path), os.path.dirname(path)])
